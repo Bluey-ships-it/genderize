@@ -7,6 +7,10 @@ A REST API that classifies names by gender using the Genderize.io API.
 - Express.js
 - Axios
 
+## Base URL
+```
+https://genderize-production.up.railway.app
+```
 
 ## Endpoint
 
