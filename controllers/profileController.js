@@ -1,0 +1,113 @@
+exports.createProfile = async (req, res) => {
+	const { name } = req.body;
+
+	// Validate input
+	if (!name || name.trim() === "") {
+		return res.status(400).json({
+			status: "error",
+			message: "Name parameter is required",
+		});
+	}
+
+	if (typeof name !== "string") {
+		return res.status(422).json({
+			status: "error",
+			message: "Name must be a string",
+		});
+	}
+
+	const cleanName = name.trim().toLowerCase();
+
+	// Check for duplicate
+	const existing = await pool.query("SELECT * FROM profiles WHERE name = $1", [
+		cleanName,
+	]);
+
+	if (existing.rows.length > 0) {
+		return res.status(200).json({
+			status: "success",
+			message: "Profile already exists",
+			data: existing.rows[0],
+		});
+	}
+
+	// Call all 3 external APIs
+	let externalData;
+	try {
+		externalData = await fetchExternalData(cleanName);
+	} catch (error) {
+		return res.status(502).json({
+			status: "error",
+			message: "Failed to reach external APIs",
+		});
+	}
+
+	const { gender, age, nationality } = externalData;
+
+	// Validate Genderize response
+	if (!gender.gender || !gender.count || gender.count === 0) {
+		return res.status(502).json({
+			status: "error",
+			message: "Genderize returned an invalid response",
+		});
+	}
+
+	// Validate Agify response
+	if (!age.age) {
+		return res.status(502).json({
+			status: "error",
+			message: "Agify returned an invalid response",
+		});
+	}
+
+	// Validate Nationalize response
+	if (!nationality.country || nationality.country.length === 0) {
+		return res.status(502).json({
+			status: "error",
+			message: "Nationalize returned an invalid response",
+		});
+	}
+
+	// Process the data
+	const topCountry = nationality.country.reduce((a, b) =>
+		a.probability > b.probability ? a : b,
+	);
+
+	const profile = {
+		id: uuidv7(),
+		name: cleanName,
+		gender: gender.gender,
+		gender_probability: gender.probability,
+		sample_size: gender.count,
+		age: age.age,
+		age_group: getAgeGroup(age.age),
+		country_id: topCountry.country_id,
+		country_probability: topCountry.probability,
+		created_at: new Date().toISOString(),
+	};
+
+	// Store in database
+	await pool.query(
+		`INSERT INTO profiles 
+      (id, name, gender, gender_probability, sample_size, age, age_group, country_id, country_probability, created_at)
+     VALUES 
+      ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+		[
+			profile.id,
+			profile.name,
+			profile.gender,
+			profile.gender_probability,
+			profile.sample_size,
+			profile.age,
+			profile.age_group,
+			profile.country_id,
+			profile.country_probability,
+			profile.created_at,
+		],
+	);
+
+	return res.status(201).json({
+		status: "success",
+		data: profile,
+	});
+};
