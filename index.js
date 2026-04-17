@@ -16,10 +16,10 @@ app.use("/api/profiles", profileRoutes);
 
 
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  console.error('Unhandled error:', err.stack);
   return res.status(500).json({
     status: 'error',
-    message: 'Internal server error'
+    message: err.message
   });
 });
 
