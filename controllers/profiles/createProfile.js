@@ -1,6 +1,6 @@
 const axios = require("axios");
 const { v7: uuidv7 } = require("uuid");
-const pool = require("../db");
+const pool = require("../../db");
 
 function getAgeGroup(age) {
 	if (age <= 12) return "child";
@@ -15,13 +15,13 @@ async function fetchExternalData(name) {
 		axios.get(`https://api.agify.io?name=${name}`),
 		axios.get(`https://api.nationalize.io?name=${name}`),
 	]);
-
 	return {
 		gender: genderRes.data,
 		age: ageRes.data,
 		nationality: nationalityRes.data,
 	};
 }
+
 
 exports.createProfile = async (req, res) => {
 	try {
@@ -137,95 +137,6 @@ exports.createProfile = async (req, res) => {
 			status: "success",
 			data: profile,
 		});
-	} catch (error) {
-		return res.status(500).json({
-			status: "error",
-			message: "Internal server error",
-		});
-	}
-};
-
-exports.getProfileById = async (req, res) => {
-	try {
-		const { id } = req.params;
-
-		const result = await pool.query("SELECT * FROM profiles WHERE id = $1", [
-			id,
-		]);
-
-		if (result.rows.length === 0) {
-			return res.status(404).json({
-				status: "error",
-				message: "Profile not found",
-			});
-		}
-
-		return res.status(200).json({
-			status: "success",
-			data: result.rows[0],
-		});
-	} catch (error) {
-		return res.status(500).json({
-			status: "error",
-			message: "Internal server error",
-		});
-	}
-};
-
-exports.getAllProfiles = async (req, res) => {
-	try {
-		const { gender, country_id, age_group } = req.query;
-
-		let query = "SELECT * FROM profiles WHERE 1=1";
-		const params = [];
-
-		if (gender) {
-			params.push(gender.toLowerCase());
-			query += ` AND LOWER(gender) = $${params.length}`;
-		}
-
-		if (country_id) {
-			params.push(country_id.toUpperCase());
-			query += ` AND UPPER(country_id) = $${params.length}`;
-		}
-
-		if (age_group) {
-			params.push(age_group.toLowerCase());
-			query += ` AND LOWER(age_group) = $${params.length}`;
-		}
-
-		const result = await pool.query(query, params);
-
-		return res.status(200).json({
-			status: "success",
-			count: result.rows.length,
-			data: result.rows,
-		});
-	} catch (error) {
-		return res.status(500).json({
-			status: "error",
-			message: "Internal server error",
-		});
-	}
-};
-
-exports.deleteProfile = async (req, res) => {
-	try {
-		const { id } = req.params;
-
-		const result = await pool.query(
-			"DELETE FROM profiles WHERE id = $1 RETURNING id",
-			[id],
-		);
-
-		if (result.rows.length === 0) {
-			return res.status(404).json({
-				status: "error",
-				message: "Profile not found",
-			});
-		}
-
-		return res.status(204).send();
 	} catch (error) {
 		return res.status(500).json({
 			status: "error",
